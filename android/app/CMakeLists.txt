@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.22)
+project(dota_item_merge_android LANGUAGES C)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+set(PLATFORM Android CACHE STRING "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(CUSTOMIZE_BUILD ON CACHE BOOL "" FORCE)
+set(SUPPORT_MODULE_RAUDIO OFF CACHE BOOL "" FORCE)
+include(FetchContent)
+FetchContent_Declare(raylib
+    URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz)
+FetchContent_MakeAvailable(raylib)
+
+add_library(dota-item-merge SHARED ../../src/main.c ../../src/game.c)
+target_include_directories(dota-item-merge PRIVATE
+    ../../src "${ANDROID_NDK}/sources/android/native_app_glue")
+target_compile_definitions(dota-item-merge PRIVATE PLATFORM_ANDROID)
+target_compile_options(dota-item-merge PRIVATE -Wall -Wextra)
+target_link_libraries(dota-item-merge PRIVATE raylib android log EGL GLESv2 m)
+# Keep the NativeActivity entry point from raylib's static native-app glue.
+# 16 KB alignment supports Android devices with larger memory pages.
+target_link_options(dota-item-merge PRIVATE
+    "-Wl,-u,ANativeActivity_onCreate" "-Wl,-z,max-page-size=16384")
