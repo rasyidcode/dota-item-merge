@@ -8,6 +8,37 @@
 #include <android_native_app_glue.h>
 // Android backend extension; not declared by the cross-platform raylib header.
 extern struct android_app *GetAndroidApp(void);
+static int32_t (*raylib_input_handler)(struct android_app *, AInputEvent *);
+static int32_t handle_android_input(struct android_app *app,AInputEvent *event) {
+    if(AInputEvent_getType(event)==AINPUT_EVENT_TYPE_KEY && AKeyEvent_getKeyCode(event)==AKEYCODE_BACK) {
+        // Android 13+ routes system Back through GameActivity's platform callback.
+        // Older Android sends completed key presses through this native queue.
+        if(app->activity->sdkVersion<33 && AKeyEvent_getAction(event)==AKEY_EVENT_ACTION_UP &&
+            !(AKeyEvent_getFlags(event)&AKEY_EVENT_FLAG_CANCELED)) {
+            JavaVM *vm=app->activity->vm;
+            JNIEnv *env=NULL;
+            bool attached=false;
+            jint status=(*vm)->GetEnv(vm,(void **)&env,JNI_VERSION_1_6);
+            if(status==JNI_EDETACHED) {
+                attached=(*vm)->AttachCurrentThread(vm,&env,NULL)==JNI_OK;
+                if(!attached) env=NULL;
+            }
+            if(env) {
+                jclass activity=(*env)->GetObjectClass(env,app->activity->clazz);
+                jmethodID on_back=activity?(*env)->GetMethodID(env,activity,"onNativeBackPressed","()V"):NULL;
+                if(on_back) (*env)->CallVoidMethod(env,app->activity->clazz,on_back);
+                if((*env)->ExceptionCheck(env)) {
+                    (*env)->ExceptionClear(env);
+                    TraceLog(LOG_WARNING,"ANDROID: Could not dispatch Back to activity");
+                }
+                if(activity) (*env)->DeleteLocalRef(env,activity);
+            }
+            if(attached) (*vm)->DetachCurrentThread(vm);
+        }
+        return 1; // Consume down, repeats, canceled releases, and modern duplicate keys.
+    }
+    return raylib_input_handler?raylib_input_handler(app,event):0;
+}
 #endif
 #if defined(PLATFORM_ANDROID)
 #define MOBILE_LAYOUT
@@ -189,6 +220,10 @@ int main(int argc,char **argv) {
 #endif
 #if defined(PLATFORM_ANDROID)
     struct android_app *app=(struct android_app *)GetAndroidApp();
+    if(app) {
+        raylib_input_handler=app->onInputEvent;
+        app->onInputEvent=handle_android_input;
+    }
     if(app && app->activity && app->activity->internalDataPath)
         snprintf(best_path,sizeof(best_path),"%s/dota-item-merge.best",app->activity->internalDataPath);
     bool touch_was_down=false, dragging=false;
@@ -311,5 +346,8 @@ int main(int argc,char **argv) {
         DrawTexturePro(canvas.texture,(Rectangle){0,0,WIDTH,-canvas_height},(Rectangle){ox,oy,WIDTH*scale,canvas_height*scale},(Vector2){0,0},0,WHITE);
         EndDrawing();
     }
+#if defined(PLATFORM_ANDROID)
+    if(app) app->onInputEvent=raylib_input_handler;
+#endif
     save_best(best); game_destroy(&game); UnloadRenderTexture(canvas);CloseWindow(); return 0;
 }

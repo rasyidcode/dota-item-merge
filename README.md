@@ -73,7 +73,7 @@ This is an unofficial fan prototype. The upgrade sequence is a game mechanic, no
 
 ## Validation
 
-Debug and Release simulation tests pass, including Box2D's internal validation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The desktop game links successfully, and a rendering harness verifies the portrait layout with Box2D running. The Android 0.2.1 debug APK builds for ARM64 and ARMv7; signatures, ZIP alignment, and native 16 KB alignment pass. On-device Box2D playtesting remains.
+Debug and Release simulation tests pass, including Box2D's internal validation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The desktop game links successfully, and a rendering harness verifies the portrait layout with Box2D running. The Android 0.2.2 debug APK builds for ARM64 and ARMv7; signatures, ZIP alignment, and native 16 KB alignment pass. On-device Box2D playtesting remains.
 
 ## Physics integration
 
@@ -85,4 +85,4 @@ A `Game` owns its world: call `game_init` once, `game_reset` for a new run, and 
 
 ## Android
 
-An Android native build with immersive fullscreen, drag/release touch controls, on-screen pause/restart buttons, and a GitHub Actions APK build are included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.2.1 Box2D debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout and immersive fullscreen; on-device fullscreen testing remains.
+An Android native build with immersive fullscreen and double-Back exit confirmation, drag/release touch controls, on-screen pause/restart buttons, and a GitHub Actions APK build are included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.2.2 Box2D debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout and immersive fullscreen; on-device Back navigation testing remains.
