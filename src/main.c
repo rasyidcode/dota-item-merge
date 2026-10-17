@@ -66,6 +66,45 @@ static const char *ITEM_ICON_FILES[ITEM_LEVELS]={
     "branches.png","tango.png","clarity.png","flask.png","magic_wand.png","boots.png",
     "blink.png","lesser_crit.png","black_king_bar.png","greater_crit.png","rapier.png"
 };
+// Match the circle to the artwork's dark border without changing its scale.
+// Preprocessing once at load time keeps gameplay rendering to one texture.
+static void prepare_item_image(Image *image) {
+    ImageFormat(image,PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    Color *pixels=(Color *)image->data;
+    int histogram[3][256]={0},samples=0;
+    for(int y=0;y<image->height;y++) for(int x=0;x<image->width;x++) {
+        if(x!=0 && y!=0 && x!=image->width-1 && y!=image->height-1) continue;
+        Color pixel=pixels[y*image->width+x];
+        histogram[0][pixel.r]++; histogram[1][pixel.g]++; histogram[2][pixel.b]++;
+        samples++;
+    }
+    unsigned char median[3];
+    for(int channel=0;channel<3;channel++) {
+        int value=0,total=histogram[channel][0];
+        while(total<=samples/2 && value<255) total+=histogram[channel][++value];
+        median[channel]=(unsigned char)value;
+    }
+    Color background={median[0],median[1],median[2],255};
+    const float feather=8.0f; // A gradual transition also softens bright edge glows.
+    for(int y=0;y<image->height;y++) for(int x=0;x<image->width;x++) {
+        int edge=x;
+        if(y<edge) edge=y;
+        if(image->width-1-x<edge) edge=image->width-1-x;
+        if(image->height-1-y<edge) edge=image->height-1-y;
+        if(edge>=feather) continue;
+        float blend=(float)edge/feather;
+        blend=blend*blend*(3.0f-2.0f*blend);
+        Color *pixel=&pixels[y*image->width+x];
+        blend*=pixel->a/255.0f;
+        pixel->r=(unsigned char)roundf(background.r+(pixel->r-background.r)*blend);
+        pixel->g=(unsigned char)roundf(background.g+(pixel->g-background.g)*blend);
+        pixel->b=(unsigned char)roundf(background.b+(pixel->b-background.b)*blend);
+        pixel->a=255;
+    }
+    // Preserve the zoomed-out artwork and its small margin within the circle.
+    int side=(int)ceilf(hypotf((float)image->width,(float)image->height)*1.06f);
+    ImageResizeCanvas(image,side,side,(side-image->width)/2,(side-image->height)/2,background);
+}
 static void load_item_textures(void) {
     for(int i=0;i<ITEM_LEVELS;i++) {
         char path[1024];
@@ -77,7 +116,12 @@ static void load_item_textures(void) {
         snprintf(path,sizeof(path),"%sassets/items/%s",GetApplicationDirectory(),ITEM_ICON_FILES[i]);
         if(!FileExists(path)) snprintf(path,sizeof(path),"assets/items/%s",ITEM_ICON_FILES[i]);
 #endif
-        item_textures[i]=LoadTexture(path);
+        Image image=LoadImage(path);
+        if(image.data) {
+            prepare_item_image(&image);
+            item_textures[i]=LoadTextureFromImage(image);
+            UnloadImage(image);
+        }
         if(item_textures[i].id) SetTextureFilter(item_textures[i],TEXTURE_FILTER_BILINEAR);
         else TraceLog(LOG_WARNING,"ITEMS: Missing icon for %s; using fallback",ITEM_DEFS[i].name);
     }
@@ -140,8 +184,8 @@ static void icon(float x,float y,int level,float r,float alpha) {
     if(!texture.id) { fallback_icon(x,y,level,r,alpha); return; }
     DrawCircle((int)x+2,(int)y+4,r,Fade(BLACK,0.25f*alpha));
     DrawCircleV((Vector2){x,y},r,Fade((Color){29,43,48,255},alpha));
-    // Crop a centered square without stretching the rectangular Dota artwork.
-    // Textured triangles clip it to the physical circle, including rotation.
+    // The color-matched padded texture shows the full artwork at a smaller scale.
+    // The circular mesh and tier rim retain the original piece size.
     float crop=(float)(texture.width<texture.height?texture.width:texture.height);
     float u=crop/(2*texture.width),v=crop/(2*texture.height),radius=fmaxf(1,r-2);
     const int segments=64;

@@ -75,7 +75,7 @@ This is an unofficial fan prototype. The upgrade sequence is a game mechanic, no
 
 ## Validation
 
-Debug and Release simulation tests pass, including Box2D's internal validation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The desktop game links successfully, and a rendering harness verifies the portrait layout with Box2D running. The Android 0.3.0 debug APK builds for ARM64 and ARMv7; signatures, ZIP alignment, and native 16 KB alignment pass. All eleven icon textures load and render in a desktop harness, including portrait layouts and rotation. The Android asset payload matches the checked-in source images. On-device playtesting remains.
+Debug and Release simulation tests pass, including Box2D's internal validation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The desktop game links successfully, and a rendering harness verifies the portrait layout with Box2D running. The Android 0.3.1 debug APK builds for ARM64 and ARMv7; signatures, ZIP alignment, and native 16 KB alignment pass. All eleven icon textures show the complete artwork, zoomed out with color-matched backgrounds and softened image edges inside the same circular pieces, and render in a desktop harness, including portrait layouts and rotation. The Android asset payload matches the checked-in source images. On-device playtesting remains.
 
 ## Physics integration
 
@@ -87,4 +87,4 @@ A `Game` owns its world: call `game_init` once, `game_reset` for a new run, and 
 
 ## Android
 
-Android includes bundled Dota 2 icons, immersive fullscreen, double-Back exit confirmation, drag/release touch controls, and pause/restart buttons. A GitHub Actions APK build is also included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.3.0 Box2D debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout and immersive fullscreen; on-device artwork and Back navigation testing remain.
+Android includes bundled Dota 2 icons, immersive fullscreen, double-Back exit confirmation, drag/release touch controls, and pause/restart buttons. A GitHub Actions APK build is also included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.3.1 Box2D debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout and immersive fullscreen; on-device artwork and Back navigation testing remain.

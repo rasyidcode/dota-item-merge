@@ -2,7 +2,7 @@
 
 These original, unmodified PNG icons were downloaded from Valve's Dota 2 CDN on 2026-10-17. Item artwork and Dota 2 names belong to Valve Corporation; these assets are separate from the game's source-code dependencies and their licenses. This is an unofficial fan prototype.
 
-The renderer clips the rectangular icons into round pieces at runtime. It preserves their aspect ratio with a centered square crop and keeps the tier-colored rim. No runtime downloads are needed.
+The renderer clips the rectangular icons into round pieces at runtime. At load time, padding fits each complete rectangular image inside the circle with a small margin, preserving its aspect ratio. The padding uses the median color of the image border, and the outer eight pixels blend gradually into it to soften the rectangular edge. Texture preparation happens once at startup. Artwork is zoomed out while the tier-colored rim and physical piece size stay the same. No runtime downloads are needed.
 
 | In-game item | File | Source | SHA-256 |
 | --- | --- | --- | --- |
