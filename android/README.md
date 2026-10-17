@@ -1,6 +1,6 @@
 # Android test build
 
-This folder packages the C/Raylib game as a native Android app, with no Java game layer. It targets Android 6.0+ ARM phones (32-bit and 64-bit) and uses landscape orientation. The APK needs no network or storage permissions.
+This folder packages the C/Raylib game as a native Android app, with no Java game layer. It targets Android 6.0+ ARM phones (32-bit and 64-bit) and uses portrait orientation with a responsive phone layout. The APK needs no network or storage permissions.
 
 ## Phone controls
 
@@ -47,4 +47,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Current validation status
 
-The shared physics tests pass, and the desktop rendering source passes strict syntax checks against Raylib 5.5. The Android configuration and touch integration have been reviewed against Raylib's Android backend, but have **not** been compiled or tested on a phone: the development sandbox has no SDK/NDK/Gradle and cannot reach its download proxy. No APK is included in the source ZIP. A successful Android build and on-device test are still needed.
+Version 0.1.1 builds successfully as a signed debug APK for ARM64 and ARMv7 using the pinned toolchain. Physics tests, strict desktop/mobile rendering syntax checks, APK signature verification, ZIP alignment, and 16 KB native-library alignment checks pass. A desktop rendering harness verified the portrait layout at 16:9 and 20:9 phone ratios and the pause screen; its checks also cover touch coordinate mapping. The portrait APK still needs an on-device playtest.
+
+Android uses the native display resolution, avoiding extra Raylib letterboxing. Scores and the next delivery appear above the stash, with a compact upgrade path and large pause/restart controls below. Desktop retains its landscape layout.

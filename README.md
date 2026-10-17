@@ -76,4 +76,4 @@ The simulation tests pass with strict compiler warnings and AddressSanitizer/Und
 
 ## Android
 
-An Android native build, drag/release touch controls, on-screen pause/restart buttons, and a GitHub Actions APK build are included. See [Android instructions](android/README.md) for producing and installing a signed test APK. Android builds have not yet been verified in the development sandbox.
+An Android native build, drag/release touch controls, on-screen pause/restart buttons, and a GitHub Actions APK build are included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.1.1 debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout; on-device portrait testing remains.
