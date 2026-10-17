@@ -1,6 +1,6 @@
 # Android test build
 
-This folder packages the C/Raylib game as a native Android app, with no Java game layer. It targets Android 6.0+ ARM phones (32-bit and 64-bit) and uses portrait orientation with a responsive phone layout. The APK needs no network or storage permissions.
+This folder packages the C/Raylib/Box2D game as a native Android app, with no Java game layer. It targets Android 6.0+ ARM phones (32-bit and 64-bit) and uses portrait orientation with a responsive phone layout. The APK needs no network or storage permissions.
 
 ## Phone controls
 
@@ -31,7 +31,7 @@ cd android
 gradle assembleDebug
 ```
 
-On Windows use `gradle.bat assembleDebug`. Use the installed Gradle 8.9 distribution; a Gradle wrapper is not bundled. The first build downloads Raylib 5.5 and Gradle dependencies and needs internet access. Accept SDK licenses with `sdkmanager --licenses` if prompted by the build.
+On Windows use `gradle.bat assembleDebug`. Use the installed Gradle 8.9 distribution; a Gradle wrapper is not bundled. The first build downloads Raylib 5.5, Box2D 3.1.1, and Gradle dependencies and needs internet access. Accept SDK licenses with `sdkmanager --licenses` if prompted by the build.
 
 The signed test APK will be at:
 
@@ -47,6 +47,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Current validation status
 
-Version 0.1.1 builds successfully as a signed debug APK for ARM64 and ARMv7 using the pinned toolchain. Physics tests, strict desktop/mobile rendering syntax checks, APK signature verification, ZIP alignment, and 16 KB native-library alignment checks pass. A desktop rendering harness verified the portrait layout at 16:9 and 20:9 phone ratios and the pause screen; its checks also cover touch coordinate mapping. The portrait APK still needs an on-device playtest.
+Version 0.2.0 uses Box2D 3.1.1 and builds successfully as a signed debug APK for ARM64 and ARMv7 using the pinned toolchain. Physics tests pass in Debug and Release, including simultaneous merges, fast impacts, rotation, and repeated world recreation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. APK signatures, ZIP alignment, and 16 KB native-library alignment are verified.
 
-Android uses the native display resolution, avoiding extra Raylib letterboxing. Scores and the next delivery appear above the stash, with a compact upgrade path and large pause/restart controls below. Desktop retains its landscape layout.
+The portrait layout was rendered with the Box2D simulation at 16:9 and 20:9 phone ratios and with the pause screen. Android uses the native display resolution, avoiding extra Raylib letterboxing. Scores and the next delivery appear above the stash, with a compact upgrade path and large pause/restart controls below. Desktop retains its landscape layout. The Box2D APK still needs an on-device playtest.

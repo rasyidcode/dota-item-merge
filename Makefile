@@ -1,10 +1,13 @@
 .PHONY: all test clean
+CMAKE ?= cmake
+CMAKE_ARGS ?=
 all:
-	cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-	cmake --build build --parallel
+	$(CMAKE) -S . -B build -DCMAKE_BUILD_TYPE=Release $(CMAKE_ARGS)
+	$(CMAKE) --build build --parallel
 test:
-	mkdir -p build
-	$(CC) -std=c99 -Wall -Wextra -Wpedantic -Werror -Isrc tests/test_game.c src/game.c -lm -o build/physics-tests
-	./build/physics-tests
+	$(CMAKE) -S . -B build-tests -DBUILD_GAME=OFF -DCMAKE_BUILD_TYPE=Debug $(CMAKE_ARGS)
+	$(CMAKE) --build build-tests --parallel
+	ctest --test-dir build-tests --output-on-failure
 clean:
-	rm -rf build
+	$(CMAKE) -E remove_directory build
+	$(CMAKE) -E remove_directory build-tests

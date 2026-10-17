@@ -95,7 +95,12 @@ static void draw_stash(const Game *game,bool paused,float aim) {
         icon(aim,DROP_Y,game->current,r,game->cooldown>0?0.3f:0.8f);
     }
     for(int i=0;i<MAX_ITEMS;i++) if(game->items[i].active) {
-        const Item *a=&game->items[i]; icon(a->x,a->y,a->level,ITEM_DEFS[a->level].radius,1);
+        const Item *a=&game->items[i];
+        rlPushMatrix();
+        rlTranslatef(a->x,a->y,0);
+        rlRotatef(a->angle*RAD2DEG,0,0,1);
+        icon(0,0,a->level,ITEM_DEFS[a->level].radius,1);
+        rlPopMatrix();
     }
     for(int i=0;i<MAX_EFFECTS;i++) if(game->effects[i].life>0) {
         const Effect *e=&game->effects[i];float t=1-e->life/0.55f;
@@ -235,7 +240,7 @@ int main(int argc,char **argv) {
         bool toggle_pause=IsKeyPressed(KEY_P)||(pressed&&CheckCollisionPointRec(mouse,pause_button));
         if(restart) {
             if(game.score>best) {best=game.score;save_best(best);}
-            game_init(&game,(uint32_t)time(NULL)); paused=false; accumulator=0;
+            game_reset(&game,(uint32_t)time(NULL)); paused=false; accumulator=0;
         }
         if(toggle_pause && !game.over) paused=!paused;
 #if defined(MOBILE_LAYOUT)
@@ -306,5 +311,5 @@ int main(int argc,char **argv) {
         DrawTexturePro(canvas.texture,(Rectangle){0,0,WIDTH,-canvas_height},(Rectangle){ox,oy,WIDTH*scale,canvas_height*scale},(Vector2){0,0},0,WHITE);
         EndDrawing();
     }
-    save_best(best); UnloadRenderTexture(canvas);CloseWindow(); return 0;
+    save_best(best); game_destroy(&game); UnloadRenderTexture(canvas);CloseWindow(); return 0;
 }
