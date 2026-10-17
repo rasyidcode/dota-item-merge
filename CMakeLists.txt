@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(dota_item_merge VERSION 0.2.0 LANGUAGES C CXX)
+project(dota_item_merge VERSION 0.3.0 LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -23,6 +23,11 @@ if(BUILD_GAME)
     endif()
     add_executable(dota-item-merge src/main.c)
     target_link_libraries(dota-item-merge PRIVATE merge_physics raylib)
+    add_custom_target(game-assets ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:dota-item-merge>/assets"
+        COMMENT "Copying bundled item artwork" VERBATIM)
+    add_dependencies(dota-item-merge game-assets)
     if(NOT MSVC)
         target_compile_options(dota-item-merge PRIVATE -Wall -Wextra -Wpedantic)
     endif()

@@ -42,7 +42,7 @@ cmake --build build --config Release
 .\build\Release\dota-item-merge.exe
 ```
 
-A working graphics driver and desktop display are required. No runtime asset downloads are needed.
+A working graphics driver and desktop display are required. No runtime asset downloads are needed. Desktop builds copy `assets/` beside the executable; include that directory when sharing a build. Android packages the same icons inside the APK.
 
 ## Test the simulation
 
@@ -66,14 +66,16 @@ Tests cover every merge tier, final-tier behavior, different-tier collisions, si
 
 - `src/game.c`, `src/game.h`: Box2D integration and Raylib-independent game rules.
 - `cmake/Box2D.cmake`: shared, pinned Box2D dependency for desktop, tests, and Android.
-- `src/main.c`: Raylib rendering, input, procedural icons, and local best score.
+- `src/main.c`: Raylib rendering, input, bundled Dota 2 item icons, and local best score.
+- `assets/items/`: original Dota 2 item PNGs from Valve's CDN.
+- `assets/README.md`: source URLs, ownership attribution, and SHA-256 checksums.
 - `tests/test_game.c`: simulation tests.
 
-This is an unofficial fan prototype. The upgrade sequence is a game mechanic, not Dota 2's crafting recipes. Icons are original procedural drawings; no Valve artwork is bundled. Dota 2 and item names belong to Valve. Raylib is distributed under its own zlib license; [Box2D](https://github.com/erincatto/box2d/tree/v3.1.1) uses the MIT license.
+This is an unofficial fan prototype. The upgrade sequence is a game mechanic, not Dota 2's crafting recipes. Original Valve item artwork is bundled; [asset sources and attribution](assets/README.md) list every image and its checksum. Dota 2 and item names belong to Valve. Raylib is distributed under its own zlib license; [Box2D](https://github.com/erincatto/box2d/tree/v3.1.1) uses the MIT license.
 
 ## Validation
 
-Debug and Release simulation tests pass, including Box2D's internal validation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The desktop game links successfully, and a rendering harness verifies the portrait layout with Box2D running. The Android 0.2.2 debug APK builds for ARM64 and ARMv7; signatures, ZIP alignment, and native 16 KB alignment pass. On-device Box2D playtesting remains.
+Debug and Release simulation tests pass, including Box2D's internal validation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The desktop game links successfully, and a rendering harness verifies the portrait layout with Box2D running. The Android 0.3.0 debug APK builds for ARM64 and ARMv7; signatures, ZIP alignment, and native 16 KB alignment pass. All eleven icon textures load and render in a desktop harness, including portrait layouts and rotation. The Android asset payload matches the checked-in source images. On-device playtesting remains.
 
 ## Physics integration
 
@@ -85,4 +87,4 @@ A `Game` owns its world: call `game_init` once, `game_reset` for a new run, and 
 
 ## Android
 
-An Android native build with immersive fullscreen and double-Back exit confirmation, drag/release touch controls, on-screen pause/restart buttons, and a GitHub Actions APK build are included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.2.2 Box2D debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout and immersive fullscreen; on-device Back navigation testing remains.
+Android includes bundled Dota 2 icons, immersive fullscreen, double-Back exit confirmation, drag/release touch controls, and pause/restart buttons. A GitHub Actions APK build is also included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.3.0 Box2D debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout and immersive fullscreen; on-device artwork and Back navigation testing remain.

@@ -61,11 +61,38 @@ static void label(const char *s,int x,int y,int size,Color c) { DrawText(s,x,y,s
 static void center(const char *s,int x,int y,int size,Color c) {
     DrawText(s,x-MeasureText(s,size)/2,y,size,c);
 }
+static Texture2D item_textures[ITEM_LEVELS];
+static const char *ITEM_ICON_FILES[ITEM_LEVELS]={
+    "branches.png","tango.png","clarity.png","flask.png","magic_wand.png","boots.png",
+    "blink.png","lesser_crit.png","black_king_bar.png","greater_crit.png","rapier.png"
+};
+static void load_item_textures(void) {
+    for(int i=0;i<ITEM_LEVELS;i++) {
+        char path[1024];
+#if defined(PLATFORM_ANDROID)
+        // Gradle bundles the shared assets directory at the APK asset root.
+        snprintf(path,sizeof(path),"items/%s",ITEM_ICON_FILES[i]);
+#else
+        // Prefer assets beside the executable, regardless of the launch directory.
+        snprintf(path,sizeof(path),"%sassets/items/%s",GetApplicationDirectory(),ITEM_ICON_FILES[i]);
+        if(!FileExists(path)) snprintf(path,sizeof(path),"assets/items/%s",ITEM_ICON_FILES[i]);
+#endif
+        item_textures[i]=LoadTexture(path);
+        if(item_textures[i].id) SetTextureFilter(item_textures[i],TEXTURE_FILTER_BILINEAR);
+        else TraceLog(LOG_WARNING,"ITEMS: Missing icon for %s; using fallback",ITEM_DEFS[i].name);
+    }
+}
+static void unload_item_textures(void) {
+    for(int i=0;i<ITEM_LEVELS;i++) {
+        if(item_textures[i].id) UnloadTexture(item_textures[i]);
+        item_textures[i]=(Texture2D){0};
+    }
+}
 static Vector2 point(float x,float y,float u,float v,float s) { return (Vector2){x+u*s,y+v*s}; }
 static void stroke(float x,float y,float s,float ax,float ay,float bx,float by,float thick,Color c) {
     DrawLineEx(point(x,y,ax,ay,s),point(x,y,bx,by,s),thick*s,c);
 }
-static void icon(float x,float y,int level,float r,float alpha) {
+static void fallback_icon(float x,float y,int level,float r,float alpha) {
     Color c=Fade(COLORS[level],alpha),light=Fade(INK,alpha);
     float s=r/32;
     DrawCircle((int)x+2,(int)y+4,r,Fade(BLACK,0.25f*alpha));
@@ -107,6 +134,33 @@ static void icon(float x,float y,int level,float r,float alpha) {
             }
         }
     }
+}
+static void icon(float x,float y,int level,float r,float alpha) {
+    Texture2D texture=item_textures[level];
+    if(!texture.id) { fallback_icon(x,y,level,r,alpha); return; }
+    DrawCircle((int)x+2,(int)y+4,r,Fade(BLACK,0.25f*alpha));
+    DrawCircleV((Vector2){x,y},r,Fade((Color){29,43,48,255},alpha));
+    // Crop a centered square without stretching the rectangular Dota artwork.
+    // Textured triangles clip it to the physical circle, including rotation.
+    float crop=(float)(texture.width<texture.height?texture.width:texture.height);
+    float u=crop/(2*texture.width),v=crop/(2*texture.height),radius=fmaxf(1,r-2);
+    const int segments=64;
+    Color tint=Fade(WHITE,alpha);
+    rlCheckRenderBatchLimit(segments*3);
+    // Switching primitive mode resets the batch texture in OpenGL 3/ES2.
+    rlBegin(RL_TRIANGLES);
+    rlSetTexture(texture.id);
+    rlColor4ub(tint.r,tint.g,tint.b,tint.a);
+    for(int i=0;i<segments;i++) {
+        float a=(float)i*2*PI/segments,b=(float)(i+1)*2*PI/segments;
+        float ax=cosf(a),ay=sinf(a),bx=cosf(b),by=sinf(b);
+        rlTexCoord2f(0.5f,0.5f); rlVertex2f(x,y);
+        rlTexCoord2f(0.5f+bx*u,0.5f+by*v); rlVertex2f(x+bx*radius,y+by*radius);
+        rlTexCoord2f(0.5f+ax*u,0.5f+ay*v); rlVertex2f(x+ax*radius,y+ay*radius);
+    }
+    rlEnd();
+    rlSetTexture(0);
+    DrawCircleLines((int)x,(int)y,r-1,Fade(COLORS[level],alpha));
 }
 static void card(int x,int y,int w,int h) {
     DrawRectangleRounded((Rectangle){x,y,w,h},0.08f,8,PANEL);
@@ -234,6 +288,7 @@ int main(int argc,char **argv) {
     SetWindowMinSize(780,615);
 #endif
 #endif
+    load_item_textures();
     SetTargetFPS(60);
     int canvas_height=HEIGHT;
 #if defined(MOBILE_LAYOUT)
@@ -349,5 +404,5 @@ int main(int argc,char **argv) {
 #if defined(PLATFORM_ANDROID)
     if(app) app->onInputEvent=raylib_input_handler;
 #endif
-    save_best(best); game_destroy(&game); UnloadRenderTexture(canvas);CloseWindow(); return 0;
+    save_best(best); game_destroy(&game); unload_item_textures(); UnloadRenderTexture(canvas);CloseWindow(); return 0;
 }
