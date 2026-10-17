@@ -1,13 +1,18 @@
 # Android test build
 
-This folder packages the C/Raylib/Box2D game as a native Android app, with no Java game layer. It targets Android 6.0+ ARM phones (32-bit and 64-bit) and uses portrait orientation with a responsive phone layout. The APK needs no network or storage permissions.
+This folder packages the C/Raylib/Box2D game as a native Android app, with a small Java NativeActivity host for fullscreen system-bar control. It targets Android 6.0+ ARM phones (32-bit and 64-bit) and uses portrait orientation with a responsive phone layout and immersive fullscreen. The APK needs no network or storage permissions.
 
 ## Phone controls
 
 - Touch inside the stash and drag horizontally to aim.
 - Lift your finger to drop one item. There is a short delivery cooldown.
-- Tap PAUSE / RESUME or NEW RUN in the left panel.
+- Tap PAUSE / RESUME or NEW RUN below the stash.
 - Personal best is saved to Android's private app storage after scoring.
+- Android's status and navigation bars stay hidden during play. Swipe from an edge to reveal them temporarily; they hide again automatically.
+
+## Fullscreen behavior
+
+`GameActivity` extends Android's `NativeActivity`; all gameplay and rendering remain native. It hides system bars at launch, after resume, and when window focus returns. Android 11+ uses `WindowInsetsController` with transient bars revealed by swipe; Android 6–10 uses sticky immersive flags. Layout stays behind transient bars so revealing navigation does not resize the game. This follows [Android's immersive-mode guidance](https://developer.android.com/develop/ui/views/layout/immersive) and adds no permissions or AndroidX dependency.
 
 ## Get an APK from GitHub Actions
 
@@ -47,6 +52,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Current validation status
 
-Version 0.2.0 uses Box2D 3.1.1 and builds successfully as a signed debug APK for ARM64 and ARMv7 using the pinned toolchain. Physics tests pass in Debug and Release, including simultaneous merges, fast impacts, rotation, and repeated world recreation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. APK signatures, ZIP alignment, and 16 KB native-library alignment are verified.
+Version 0.2.1 adds immersive fullscreen, retains Box2D 3.1.1 and builds successfully as a signed debug APK for ARM64 and ARMv7 using the pinned toolchain. Physics tests pass in Debug and Release, including simultaneous merges, fast impacts, rotation, and repeated world recreation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The fullscreen Java host compiles, Android lint completes with zero errors (four existing warnings about portrait orientation, backup configuration, and the missing launcher icon), and APK signatures, ZIP alignment, and 16 KB native-library alignment are verified.
 
-The portrait layout was rendered with the Box2D simulation at 16:9 and 20:9 phone ratios and with the pause screen. Android uses the native display resolution, avoiding extra Raylib letterboxing. Scores and the next delivery appear above the stash, with a compact upgrade path and large pause/restart controls below. Desktop retains its landscape layout. The Box2D APK still needs an on-device playtest.
+The portrait layout was rendered with the Box2D simulation at 16:9 and 20:9 phone ratios and with the pause screen. Android uses the native display resolution, avoiding extra Raylib letterboxing. Scores and the next delivery appear above the stash, with a compact upgrade path and large pause/restart controls below. Desktop retains its landscape layout. Fullscreen startup, edge-swipe behavior, and returning from Home still need an on-device playtest.
