@@ -1,6 +1,6 @@
 # Dota Item Merge
 
-A Suika-style desktop game built in C99 with Raylib 5.5. Drop Dota-inspired items into a stash; matching items combine into the next tier. Work your way from Iron Branch to Divine Rapier before the stash overflows.
+A Suika-style desktop game built in C17 with Raylib 5.5 and Box2D 3.1.1. Drop Dota-inspired items into a stash; matching items combine into the next tier. Work your way from Iron Branch to Divine Rapier before the stash overflows.
 
 ## Play
 
@@ -10,11 +10,11 @@ A Suika-style desktop game built in C99 with Raylib 5.5. Drop Dota-inspired item
 - Items that remain above the dashed line for two seconds end the run. New drops and newly merged items have a short grace period.
 - Divine Rapiers are the final tier and do not merge further.
 
-The game has circle physics with mass-weighted collisions, eleven tiers, merge effects, a next-item preview, keyboard controls, a resizable window, and a personal best saved as `dota-item-merge.best` in the working directory.
+The game has Box2D circle physics with gravity, friction, rotation, sleeping, and continuous collisions, eleven tiers, merge effects, a next-item preview, keyboard controls, a resizable window, and a personal best saved as `dota-item-merge.best` in the working directory.
 
 ## Build and run
 
-Install a C compiler and CMake 3.20+. CMake uses an installed Raylib 5.5 package or downloads the pinned Raylib 5.5 source on the first build.
+Install a C17-capable C compiler, a C++ compiler (required by Box2D's CMake configuration), and CMake 3.22+. CMake downloads the pinned Box2D 3.1.1 source with a SHA-256 check. It uses an installed Raylib 5.5 package or downloads the pinned Raylib source. The first build requires internet access.
 
 ### Linux (Debian / Ubuntu)
 
@@ -42,11 +42,11 @@ cmake --build build --config Release
 .\build\Release\dota-item-merge.exe
 ```
 
-A working graphics driver and desktop display are required. No runtime asset downloads are needed.
+A working graphics driver and desktop display are required. No runtime asset downloads are needed. Desktop builds copy `assets/` beside the executable; include that directory when sharing a build. Android packages the same icons inside the APK.
 
 ## Test the simulation
 
-On Linux/macOS, the physics tests need only a C compiler and Make:
+On Linux/macOS, run the simulation tests through Make and CMake:
 
 ```sh
 make test
@@ -60,20 +60,31 @@ cmake --build build-tests
 ctest --test-dir build-tests --output-on-failure
 ```
 
-Tests cover every merge tier, final-tier behavior, different-tier collisions, drop limits and cooldown, floor settling, overflow, and a seeded collision stress run.
+Tests cover every merge tier, final-tier behavior, different-tier collisions, simultaneous contacts, drop limits and cooldown, floor settling, fast wall/floor impacts, rotation, overflow, invalid inputs, full capacity, a seeded collision stress run, and repeated world destruction/recreation. Test builds download Box2D but do not need Raylib or a display.
 
 ## Source
 
-- `src/game.c`, `src/game.h`: Raylib-independent fixed-step physics and game rules.
-- `src/main.c`: Raylib rendering, input, procedural icons, and local best score.
+- `src/game.c`, `src/game.h`: Box2D integration and Raylib-independent game rules.
+- `cmake/Box2D.cmake`: shared, pinned Box2D dependency for desktop, tests, and Android.
+- `src/main.c`: Raylib rendering, input, bundled Dota 2 item icons, and local best score.
+- `assets/items/`: original Dota 2 item PNGs from Valve's CDN.
+- `assets/README.md`: source URLs, ownership attribution, and SHA-256 checksums.
 - `tests/test_game.c`: simulation tests.
 
-This is an unofficial fan prototype. The upgrade sequence is a game mechanic, not Dota 2's crafting recipes. Icons are original procedural drawings; no Valve artwork is bundled. Dota 2 and item names belong to Valve. Raylib is distributed under its own zlib license.
+This is an unofficial fan prototype. The upgrade sequence is a game mechanic, not Dota 2's crafting recipes. Original Valve item artwork is bundled; [asset sources and attribution](assets/README.md) list every image and its checksum. Dota 2 and item names belong to Valve. Raylib is distributed under its own zlib license; [Box2D](https://github.com/erincatto/box2d/tree/v3.1.1) uses the MIT license.
 
 ## Validation
 
-The simulation tests pass with strict compiler warnings and AddressSanitizer/UndefinedBehaviorSanitizer (leak detection disabled because of the sandbox). Rendering source passes C99 syntax checks against the official Raylib 5.5 header. A linked graphical build and visual playtest remain to be run on a desktop with Raylib build dependencies; the development sandbox had no display or Raylib installation and its download proxy was unreachable.
+Debug and Release simulation tests pass, including Box2D's internal validation. AddressSanitizer, UndefinedBehaviorSanitizer, and leak detection pass. The desktop game links successfully, and a rendering harness verifies the portrait layout with Box2D running. The Android 0.3.1 debug APK builds for ARM64 and ARMv7; signatures, ZIP alignment, and native 16 KB alignment pass. All eleven icon textures show the complete artwork, zoomed out with color-matched backgrounds and softened image edges inside the same circular pieces, and render in a desktop harness, including portrait layouts and rotation. The Android asset payload matches the checked-in source images. On-device playtesting remains.
+
+## Physics integration
+
+Box2D advances at 120 fixed steps per second with four solver substeps. Coordinates convert at 50 pixels per meter; equal-density circle bodies provide mass proportional to their area. The stash uses a static floor and two side walls, with an open top. Rendering follows body positions and rotation.
+
+Contact events are collected after each step, then matching pairs are merged after the event buffer has been read. Each item can join at most one pair per step. Both old bodies are destroyed and a larger circle is created inside the stash boundaries, retaining the scoring, merge effects, and overflow grace period.
+
+A `Game` owns its world: call `game_init` once, `game_reset` for a new run, and `game_destroy` when finished. Do not copy a live `Game`; its shape user data refers to its item array. Use `game_spawn` for simulation fixtures rather than writing new items directly into that array.
 
 ## Android
 
-An Android native build, drag/release touch controls, on-screen pause/restart buttons, and a GitHub Actions APK build are included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.1.1 debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout; on-device portrait testing remains.
+Android includes bundled Dota 2 icons, immersive fullscreen, double-Back exit confirmation, drag/release touch controls, and pause/restart buttons. A GitHub Actions APK build is also included. See [Android instructions](android/README.md) for producing and installing a signed test APK. The signed Android 0.3.1 Box2D debug build has been verified for ARM64 and ARMv7, with a responsive portrait layout and immersive fullscreen; on-device artwork and Back navigation testing remain.

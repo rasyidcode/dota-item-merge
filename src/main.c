@@ -8,6 +8,37 @@
 #include <android_native_app_glue.h>
 // Android backend extension; not declared by the cross-platform raylib header.
 extern struct android_app *GetAndroidApp(void);
+static int32_t (*raylib_input_handler)(struct android_app *, AInputEvent *);
+static int32_t handle_android_input(struct android_app *app,AInputEvent *event) {
+    if(AInputEvent_getType(event)==AINPUT_EVENT_TYPE_KEY && AKeyEvent_getKeyCode(event)==AKEYCODE_BACK) {
+        // Android 13+ routes system Back through GameActivity's platform callback.
+        // Older Android sends completed key presses through this native queue.
+        if(app->activity->sdkVersion<33 && AKeyEvent_getAction(event)==AKEY_EVENT_ACTION_UP &&
+            !(AKeyEvent_getFlags(event)&AKEY_EVENT_FLAG_CANCELED)) {
+            JavaVM *vm=app->activity->vm;
+            JNIEnv *env=NULL;
+            bool attached=false;
+            jint status=(*vm)->GetEnv(vm,(void **)&env,JNI_VERSION_1_6);
+            if(status==JNI_EDETACHED) {
+                attached=(*vm)->AttachCurrentThread(vm,&env,NULL)==JNI_OK;
+                if(!attached) env=NULL;
+            }
+            if(env) {
+                jclass activity=(*env)->GetObjectClass(env,app->activity->clazz);
+                jmethodID on_back=activity?(*env)->GetMethodID(env,activity,"onNativeBackPressed","()V"):NULL;
+                if(on_back) (*env)->CallVoidMethod(env,app->activity->clazz,on_back);
+                if((*env)->ExceptionCheck(env)) {
+                    (*env)->ExceptionClear(env);
+                    TraceLog(LOG_WARNING,"ANDROID: Could not dispatch Back to activity");
+                }
+                if(activity) (*env)->DeleteLocalRef(env,activity);
+            }
+            if(attached) (*vm)->DetachCurrentThread(vm);
+        }
+        return 1; // Consume down, repeats, canceled releases, and modern duplicate keys.
+    }
+    return raylib_input_handler?raylib_input_handler(app,event):0;
+}
 #endif
 #if defined(PLATFORM_ANDROID)
 #define MOBILE_LAYOUT
@@ -30,11 +61,82 @@ static void label(const char *s,int x,int y,int size,Color c) { DrawText(s,x,y,s
 static void center(const char *s,int x,int y,int size,Color c) {
     DrawText(s,x-MeasureText(s,size)/2,y,size,c);
 }
+static Texture2D item_textures[ITEM_LEVELS];
+static const char *ITEM_ICON_FILES[ITEM_LEVELS]={
+    "branches.png","tango.png","clarity.png","flask.png","magic_wand.png","boots.png",
+    "blink.png","lesser_crit.png","black_king_bar.png","greater_crit.png","rapier.png"
+};
+// Match the circle to the artwork's dark border without changing its scale.
+// Preprocessing once at load time keeps gameplay rendering to one texture.
+static void prepare_item_image(Image *image) {
+    ImageFormat(image,PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    Color *pixels=(Color *)image->data;
+    int histogram[3][256]={0},samples=0;
+    for(int y=0;y<image->height;y++) for(int x=0;x<image->width;x++) {
+        if(x!=0 && y!=0 && x!=image->width-1 && y!=image->height-1) continue;
+        Color pixel=pixels[y*image->width+x];
+        histogram[0][pixel.r]++; histogram[1][pixel.g]++; histogram[2][pixel.b]++;
+        samples++;
+    }
+    unsigned char median[3];
+    for(int channel=0;channel<3;channel++) {
+        int value=0,total=histogram[channel][0];
+        while(total<=samples/2 && value<255) total+=histogram[channel][++value];
+        median[channel]=(unsigned char)value;
+    }
+    Color background={median[0],median[1],median[2],255};
+    const float feather=8.0f; // A gradual transition also softens bright edge glows.
+    for(int y=0;y<image->height;y++) for(int x=0;x<image->width;x++) {
+        int edge=x;
+        if(y<edge) edge=y;
+        if(image->width-1-x<edge) edge=image->width-1-x;
+        if(image->height-1-y<edge) edge=image->height-1-y;
+        if(edge>=feather) continue;
+        float blend=(float)edge/feather;
+        blend=blend*blend*(3.0f-2.0f*blend);
+        Color *pixel=&pixels[y*image->width+x];
+        blend*=pixel->a/255.0f;
+        pixel->r=(unsigned char)roundf(background.r+(pixel->r-background.r)*blend);
+        pixel->g=(unsigned char)roundf(background.g+(pixel->g-background.g)*blend);
+        pixel->b=(unsigned char)roundf(background.b+(pixel->b-background.b)*blend);
+        pixel->a=255;
+    }
+    // Preserve the zoomed-out artwork and its small margin within the circle.
+    int side=(int)ceilf(hypotf((float)image->width,(float)image->height)*1.06f);
+    ImageResizeCanvas(image,side,side,(side-image->width)/2,(side-image->height)/2,background);
+}
+static void load_item_textures(void) {
+    for(int i=0;i<ITEM_LEVELS;i++) {
+        char path[1024];
+#if defined(PLATFORM_ANDROID)
+        // Gradle bundles the shared assets directory at the APK asset root.
+        snprintf(path,sizeof(path),"items/%s",ITEM_ICON_FILES[i]);
+#else
+        // Prefer assets beside the executable, regardless of the launch directory.
+        snprintf(path,sizeof(path),"%sassets/items/%s",GetApplicationDirectory(),ITEM_ICON_FILES[i]);
+        if(!FileExists(path)) snprintf(path,sizeof(path),"assets/items/%s",ITEM_ICON_FILES[i]);
+#endif
+        Image image=LoadImage(path);
+        if(image.data) {
+            prepare_item_image(&image);
+            item_textures[i]=LoadTextureFromImage(image);
+            UnloadImage(image);
+        }
+        if(item_textures[i].id) SetTextureFilter(item_textures[i],TEXTURE_FILTER_BILINEAR);
+        else TraceLog(LOG_WARNING,"ITEMS: Missing icon for %s; using fallback",ITEM_DEFS[i].name);
+    }
+}
+static void unload_item_textures(void) {
+    for(int i=0;i<ITEM_LEVELS;i++) {
+        if(item_textures[i].id) UnloadTexture(item_textures[i]);
+        item_textures[i]=(Texture2D){0};
+    }
+}
 static Vector2 point(float x,float y,float u,float v,float s) { return (Vector2){x+u*s,y+v*s}; }
 static void stroke(float x,float y,float s,float ax,float ay,float bx,float by,float thick,Color c) {
     DrawLineEx(point(x,y,ax,ay,s),point(x,y,bx,by,s),thick*s,c);
 }
-static void icon(float x,float y,int level,float r,float alpha) {
+static void fallback_icon(float x,float y,int level,float r,float alpha) {
     Color c=Fade(COLORS[level],alpha),light=Fade(INK,alpha);
     float s=r/32;
     DrawCircle((int)x+2,(int)y+4,r,Fade(BLACK,0.25f*alpha));
@@ -77,6 +179,33 @@ static void icon(float x,float y,int level,float r,float alpha) {
         }
     }
 }
+static void icon(float x,float y,int level,float r,float alpha) {
+    Texture2D texture=item_textures[level];
+    if(!texture.id) { fallback_icon(x,y,level,r,alpha); return; }
+    DrawCircle((int)x+2,(int)y+4,r,Fade(BLACK,0.25f*alpha));
+    DrawCircleV((Vector2){x,y},r,Fade((Color){29,43,48,255},alpha));
+    // The color-matched padded texture shows the full artwork at a smaller scale.
+    // The circular mesh and tier rim retain the original piece size.
+    float crop=(float)(texture.width<texture.height?texture.width:texture.height);
+    float u=crop/(2*texture.width),v=crop/(2*texture.height),radius=fmaxf(1,r-2);
+    const int segments=64;
+    Color tint=Fade(WHITE,alpha);
+    rlCheckRenderBatchLimit(segments*3);
+    // Switching primitive mode resets the batch texture in OpenGL 3/ES2.
+    rlBegin(RL_TRIANGLES);
+    rlSetTexture(texture.id);
+    rlColor4ub(tint.r,tint.g,tint.b,tint.a);
+    for(int i=0;i<segments;i++) {
+        float a=(float)i*2*PI/segments,b=(float)(i+1)*2*PI/segments;
+        float ax=cosf(a),ay=sinf(a),bx=cosf(b),by=sinf(b);
+        rlTexCoord2f(0.5f,0.5f); rlVertex2f(x,y);
+        rlTexCoord2f(0.5f+bx*u,0.5f+by*v); rlVertex2f(x+bx*radius,y+by*radius);
+        rlTexCoord2f(0.5f+ax*u,0.5f+ay*v); rlVertex2f(x+ax*radius,y+ay*radius);
+    }
+    rlEnd();
+    rlSetTexture(0);
+    DrawCircleLines((int)x,(int)y,r-1,Fade(COLORS[level],alpha));
+}
 static void card(int x,int y,int w,int h) {
     DrawRectangleRounded((Rectangle){x,y,w,h},0.08f,8,PANEL);
 }
@@ -95,7 +224,12 @@ static void draw_stash(const Game *game,bool paused,float aim) {
         icon(aim,DROP_Y,game->current,r,game->cooldown>0?0.3f:0.8f);
     }
     for(int i=0;i<MAX_ITEMS;i++) if(game->items[i].active) {
-        const Item *a=&game->items[i]; icon(a->x,a->y,a->level,ITEM_DEFS[a->level].radius,1);
+        const Item *a=&game->items[i];
+        rlPushMatrix();
+        rlTranslatef(a->x,a->y,0);
+        rlRotatef(a->angle*RAD2DEG,0,0,1);
+        icon(0,0,a->level,ITEM_DEFS[a->level].radius,1);
+        rlPopMatrix();
     }
     for(int i=0;i<MAX_EFFECTS;i++) if(game->effects[i].life>0) {
         const Effect *e=&game->effects[i];float t=1-e->life/0.55f;
@@ -184,6 +318,10 @@ int main(int argc,char **argv) {
 #endif
 #if defined(PLATFORM_ANDROID)
     struct android_app *app=(struct android_app *)GetAndroidApp();
+    if(app) {
+        raylib_input_handler=app->onInputEvent;
+        app->onInputEvent=handle_android_input;
+    }
     if(app && app->activity && app->activity->internalDataPath)
         snprintf(best_path,sizeof(best_path),"%s/dota-item-merge.best",app->activity->internalDataPath);
     bool touch_was_down=false, dragging=false;
@@ -194,6 +332,7 @@ int main(int argc,char **argv) {
     SetWindowMinSize(780,615);
 #endif
 #endif
+    load_item_textures();
     SetTargetFPS(60);
     int canvas_height=HEIGHT;
 #if defined(MOBILE_LAYOUT)
@@ -235,7 +374,7 @@ int main(int argc,char **argv) {
         bool toggle_pause=IsKeyPressed(KEY_P)||(pressed&&CheckCollisionPointRec(mouse,pause_button));
         if(restart) {
             if(game.score>best) {best=game.score;save_best(best);}
-            game_init(&game,(uint32_t)time(NULL)); paused=false; accumulator=0;
+            game_reset(&game,(uint32_t)time(NULL)); paused=false; accumulator=0;
         }
         if(toggle_pause && !game.over) paused=!paused;
 #if defined(MOBILE_LAYOUT)
@@ -306,5 +445,8 @@ int main(int argc,char **argv) {
         DrawTexturePro(canvas.texture,(Rectangle){0,0,WIDTH,-canvas_height},(Rectangle){ox,oy,WIDTH*scale,canvas_height*scale},(Vector2){0,0},0,WHITE);
         EndDrawing();
     }
-    save_best(best); UnloadRenderTexture(canvas);CloseWindow(); return 0;
+#if defined(PLATFORM_ANDROID)
+    if(app) app->onInputEvent=raylib_input_handler;
+#endif
+    save_best(best); game_destroy(&game); unload_item_textures(); UnloadRenderTexture(canvas);CloseWindow(); return 0;
 }

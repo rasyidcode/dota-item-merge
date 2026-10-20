@@ -2,6 +2,7 @@
 #define GAME_H
 #include <stdbool.h>
 #include <stdint.h>
+#include <box2d/id.h>
 #define ITEM_LEVELS 11
 #define MAX_ITEMS 192
 #define MAX_EFFECTS 48
@@ -14,14 +15,21 @@
 #define FIXED_DT (1.0f / 120.0f)
 typedef struct { const char *name; float radius; unsigned value; } ItemDef;
 extern const ItemDef ITEM_DEFS[ITEM_LEVELS];
-typedef struct { float x,y,vx,vy,age; int level; bool active; } Item;
+typedef struct { float x,y,vx,vy,age,angle; int level; bool active; } Item;
 typedef struct { float x,y,life; int level; } Effect;
 typedef struct {
     Item items[MAX_ITEMS]; Effect effects[MAX_EFFECTS];
+    b2WorldId world; b2BodyId bodies[MAX_ITEMS];
     uint32_t rng; unsigned score,merges; int current,next,highest;
     float cooldown,overflow; bool over;
 } Game;
+/* A Game owns a Box2D world: initialize once, reset for a new run, then destroy.
+ * Do not copy a live Game: shape user data refers to its item array. */
 void game_init(Game *g, uint32_t seed);
+void game_reset(Game *g, uint32_t seed);
+void game_destroy(Game *g);
+/* Spawn an item in pixel coordinates; used by drops and simulation fixtures. */
+bool game_spawn(Game *g, int level, float x, float y);
 bool game_drop(Game *g, float x);
 void game_step(Game *g, float dt);
 float game_clamp_x(float x, int level);
